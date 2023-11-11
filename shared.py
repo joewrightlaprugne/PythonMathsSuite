@@ -180,6 +180,8 @@ def getAllSolsIntervalR(equation, a, b):
         result = solveR(equation, a + i*intSize)
         if result is None:
             continue
+        if not (a < result[0] < b):
+            continue
         r = roundSF(result[0], 6)
         L = len(roundedSolutions)
         roundedSolutions.add(r)
