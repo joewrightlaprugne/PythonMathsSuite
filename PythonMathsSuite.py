@@ -11,10 +11,11 @@ equations = []
 inter = []
 top = 1
 
-global diffGraph, solGraph, diffText, diffResultText
+global diffGraph, solGraph, solInterLayer, diffText, diffResultText
 
-global allInters, complexSolutions
+global allInters, allSolutions, complexSolutions
 allInters = []
+allSolutions = []
 complexSolutions = []
 
 global clock
@@ -47,17 +48,17 @@ zoomX = (x_max-x_min)/20
 zoomY = (y_max-y_min)/20
 
 global edit, delete # Icons
-edit = pygame.image.load("files\edit.png")
-delete = pygame.image.load("files\delete.png")
-light = pygame.image.load("files\light.png")
-dark = pygame.image.load("files\dark.png")
+edit = pygame.image.load("files/edit.png")
+delete = pygame.image.load("files/delete.png")
+light = pygame.image.load("files/light.png")
+dark = pygame.image.load("files/dark.png")
 edit = pygame.transform.scale(edit, (32, 32)) # Hard-coded values
 delete = pygame.transform.scale(delete, (32, 32))
 light = pygame.transform.scale(light, (282, 464))
 dark = pygame.transform.scale(dark, (282, 464))
 
 global colours, BACKGROUND_GREY, HOVERING_GREEN, SELECTED_GREEN # Colours
-colours = [(255, 255, 0), (255, 0, 0), (255, 80, 0), (0, 255, 0), (0, 232, 255), (255, 0, 255), (147, 0, 255)] # All possible graph colours
+colours = [(255, 0, 0), (255, 80, 0), (0, 255, 0), (0, 232, 255), (255, 0, 255), (147, 0, 255)] # All possible graph colours
 BACKGROUND_GREY = (54, 54, 54)
 HOVERING_GREEN = (99, 212, 155)
 SELECTED_GREEN = (0, 184, 113)
@@ -77,16 +78,24 @@ verdana25 = pygame.font.SysFont("Verdana", 25)
 verdana20 = pygame.font.SysFont("Verdana", 20)
 verdana15 = pygame.font.SysFont("Verdana", 15)
 
-def updateInterLayer(a, b, equation=""):
+def updateInterLayer(a, b, equation="", programMode=1):
     if equation == "":
         return interLayer
     inters = getIntersSingleEq(equation, equations, a, b)
-    for inter in inters:
-        allInters.append(inter)
-        i = inter[0]
-        j = inter[1]
-        pygame.draw.circle(interLayer, (255, 255, 0), (zoomX*(i-x0), -zoomY*(j+y0)), 5)
-    return interLayer
+    if programMode == 1:
+        for inter in inters:
+            allInters.append(inter)
+            i = inter[0]
+            j = inter[1]
+            pygame.draw.circle(interLayer, (255, 255, 0), (zoomX*(i-x0), -zoomY*(j+y0)), 5)
+        return interLayer
+    else:
+        for inter in inters:
+            allSolutions.append(inter)
+            i = inter[0]
+            j = inter[1]
+            pygame.draw.circle(solInterLayer, (255, 255, 0), (zoomX*(i-x0), -zoomY*(j+y0)), 5)
+        return solInterLayer
 
 def updateInterLayerB(a, b, equation=""):
     interLayer = pygame.Surface((zoomX*(x3-x0), zoomY*(y3-y0)), pygame.SRCALPHA, 32)
@@ -347,7 +356,7 @@ def extendBaseLayer(x, y):
     return baseLayer
 
 def updateGraph():
-    global showIntercepts, diffGraph, solGraph
+    global showIntercepts, diffGraph, solGraph, solInterLayer
     blw = baseLayer.get_width()
     blh = baseLayer.get_height()
     screen.blit(baseLayer, (x_min, y_min), (blw*(x1-x0)/(x3-x0), blh*(y3-y2)/(y3-y0), x_max-x_min, y_max-y_min))
@@ -359,6 +368,8 @@ def updateGraph():
     if programMode == 3:
         try:
             screen.blit(solGraph.Layer, (x_min, y_min), (blw*(x1-x0)/(x3-x0), blh*(y3-y2)/(y3-y0), x_max-x_min, y_max-y_min))
+            if showIntercepts:
+                screen.blit(solInterLayer, (x_min, y_min), (blw*(x1-x0)/(x3-x0), blh*(y3-y2)/(y3-y0), x_max-x_min, y_max-y_min))
         except NameError:
             pass
     if programMode == 1:
@@ -387,6 +398,8 @@ global baseLayer, interLayer, numberLineH, numberLineV, numberLineLayer
 baseLayer = createBaseLayer(x0, x3)
 interLayer = pygame.Surface((zoomX*(x3-x0), zoomY*(y3-y0)), pygame.SRCALPHA, 32)
 interLayer = interLayer.convert_alpha()
+solInterLayer = pygame.Surface((zoomX*(x3-x0), zoomY*(y3-y0)), pygame.SRCALPHA, 32)
+solInterLayer = interLayer.convert_alpha()
 numberLineH = createNumberlineH(x0, x3)
 numberLineV = createNumberlineV(x0, x3)
 numberLineLayer = pygame.Surface((zoomX*(x3-x0), zoomY*(y3-y0)), pygame.SRCALPHA, 32)
@@ -601,7 +614,7 @@ class enterDiff(Frame): # Initialise the "enter equation" window
     self.entrybutton.place(x=20, y=30)
     
 def processSolve(): ### CLEAN
-    global solWindow, solGraph
+    global solWindow, solGraph, solInterLayer
     equ = solWindow.eqfield.get()
     lbound = solWindow.xfield1.get()
     ubound = solWindow.xfield2.get()
@@ -610,16 +623,22 @@ def processSolve(): ### CLEAN
     try:
         lbound = float(lbound)
         ubound = float(ubound)
-    except TypeError:
-        messagebox.showerror("Error", "Invalid syntax")
+    except ValueError:
+        messagebox.showerror("Error", "Invalid bounds")
         return
     if lbound >= ubound:
-        messagebox.showerror("Error", "Invalid syntax")
+        messagebox.showerror("Error", "Invalid bounds")
         return
     if equ.count("=") != 1:
         messagebox.showerror("Error", "Invalid syntax")
-    
-    solutions = getAllSolsIntervalR(equ, lbound, ubound)
+        return
+
+    try:
+        solutions = getAllSolsIntervalR(equ, lbound, ubound)
+    except TypeError:
+        messagebox.showerror("Error", "Invalid equation")
+        return
+        
     if solutions == []:
         messagebox.showinfo("No solutions found", "No solutions to the equation could be found in this range")
         return
@@ -630,12 +649,14 @@ def processSolve(): ### CLEAN
 
     part = equ.split("=")
     colour = choice(colours)
-    solGraph = Equation("y = " + part[0] + " - " + part[1], colour)
-    solGraph.createLayer(x0, x3, y0, y3)
+    solGraph = Equation(part[0] + " - " + part[1], colour)
+    solGraph.createLayer(x0, y3, y0, y3)
+    solInterLayer = updateInterLayer(lbound, ubound, solGraph, 3)
     updateGraph()
     return
 
 class enterSolve(Frame):
+  global solGraph
   def __init__(self, master=None):
     Frame.__init__(self, master, width=400, height=400)
     self.pack()
@@ -727,8 +748,11 @@ def processComplex():
     XUnitsPerPixel = (2*biggestx)/(x_max-x_min)
     YUnitsPerPixel = (2*biggesty)/(y_max-y_min)
     output = output.replace("+  -", "-")
-    textsurface = verdana20.render(originaleq + ", " + str(re1) + " < Re(z) < " + str(re2) + ", " + str(im1) + " < Im(z) < " + str(re2), True, (255, 0, 0))
+    textsurface = verdana20.render(originaleq + ", " + str(re1) + " < Re(z) < " + str(re2) + ", " + str(im1) + " < Im(z) < " + str(re2), True, (255, 255, 0))
     screen.blit(textsurface, (295, 242))
+    position = verdana20.render("Click on a solution to see its coordinates", True, (255, 255, 255))
+    pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(295, 265, 700, position.get_height())) # Hard-coded values
+    screen.blit(position, (295, 265))
     pygame.display.update()
     messagebox.showinfo("Solutions", output[:-2])
     return
@@ -767,8 +791,8 @@ def main(): # Main program, called when the program is started
     global x1, x2, y1, y2, lineThickness, showGridUnits, showIntercepts, x0, x3, y0, y3, baseLayer, interLayer, programMode, numberLineH, numberLineV, numberLineLayer
     c = 0
     mouseDownAt = (-1, -1)
-    tick = pygame.image.load("files\g_tick.png")
-    notick = pygame.image.load("files\g_notick.png")
+    tick = pygame.image.load("files/g_tick.png")
+    notick = pygame.image.load("files/g_notick.png")
     # Hard-coded values (should change)
     pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(286, 0, 700, 250))
     pygame.draw.line(screen, (255, 255, 255), (286, 0), (286, 960), 3)
@@ -1027,10 +1051,11 @@ def main(): # Main program, called when the program is started
                     pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(0, 348, 285, 112))
                     pygame.draw.rect(screen, SELECTED_GREEN, pygame.Rect(0, 348, 285, 112)) # Hard-coded values
                     screen.blit(light, (0, 348), (0, 348, 285, 112))
+                    pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(290, 245, 990, 42))
+                    pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(288, 0, 1000, 240)) # Hide equation list
+                    addnew = verdana30.render("Solve an equation", True, SELECTED_GREEN)
                     pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(x_min, y_min, x_max-x_min, y_max-y_min))
-                    pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(290, 245, 990, 42)) # Hard-coded values
-                    pygame.draw.line(screen, (255, 255, 255), ((x_min+x_max)/2, y_min), ((x_min+x_max)/2, y_max), 3)
-                    pygame.draw.line(screen, (255, 255, 255), (x_min, (y_min+y_max)/2), (x_max, (y_min+y_max)/2), 3)
+                    screen.blit(addnew, (x_min, y_min - addnew.get_height() - 10))
                     pygame.display.update()
                     global CmpWindow
                     CmpWindow = enterComplex() # Create complex window
@@ -1080,6 +1105,9 @@ def main(): # Main program, called when the program is started
                     if programMode == 3:
                         solWindow = enterSolve() # Create solve window
                         solWindow.mainloop()
+                    if programMode == 4:
+                        CmpWindow = enterComplex() # Create solve window
+                        CmpWindow.mainloop()
                 if 11 < pos[0] < 34 and 670 < pos[1] < 693: # If the user toggles "show grid units"
                     if programMode > 2:
                         continue
@@ -1114,6 +1142,16 @@ def main(): # Main program, called when the program is started
                     for inter in allInters:
                         if abs(inter[0] - x) < 0.2 and abs(inter[1] - y) < 0.2 and x_min < pos[0] < x_max and y_min < pos[1] < y_max:
                             positiontext = verdana30.render("Intercept: ", True, (255, 255, 255)) # Display these coordinates
+                            position = verdana20.render(str(roundSF(inter[0], 6)) + ", " + str(roundSF(inter[1], 6)), True, (255, 255, 255)) # Temporary
+                            pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(10, 565, 275, 100)) # Hard-coded values
+                            screen.blit(positiontext, (10, 565))
+                            screen.blit(position, (10, 615))
+                            pygame.display.update()
+
+                if programMode == 3:
+                    for inter in allSolutions:
+                        if abs(inter[0] - x) < 0.2 and abs(inter[1] - y) < 0.2 and x_min < pos[0] < x_max and y_min < pos[1] < y_max:
+                            positiontext = verdana30.render("Solution: ", True, (255, 255, 255)) # Display these coordinates
                             position = verdana20.render(str(roundSF(inter[0], 6)) + ", " + str(roundSF(inter[1], 6)), True, (255, 255, 255)) # Temporary
                             pygame.draw.rect(screen, BACKGROUND_GREY, pygame.Rect(10, 565, 275, 100)) # Hard-coded values
                             screen.blit(positiontext, (10, 565))
